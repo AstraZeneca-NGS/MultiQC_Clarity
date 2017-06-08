@@ -18,3 +18,15 @@ c_edit_patterns = click.option('--clarity_skip_name_editing',
     default = False,
     help = "Do not edit the sample names to remove suffixes like _1, _2, _R1, _R2."
 )
+c_config = click.option('--clarity_config',
+    type = str,
+    help = 'Сonfiguration for Genologics API'
+)
+c_samplesheet = click.option('--samplesheet',
+    type = str,
+    help = 'Sample sheet (default is located under the dataset root as SampleSheet.csv)'
+)
+c_csv = click.option('--bcbio_csv',
+    type = str,
+    help = 'CSV file (default is located in config dir)'
+)

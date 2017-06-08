@@ -1,13 +1,16 @@
+import csv
+from collections import OrderedDict, defaultdict
+from os.path import isfile, join
 
 from genologics.lims import Lims
-from genologics.config import BASEURI, USERNAME, PASSWORD
+from genologics import config as genologics_config
 
 from multiqc.utils import report, config
 from multiqc.modules.base_module import BaseMultiqcModule
 from multiqc.plots import table
 
-from collections import OrderedDict
 import logging
+
 
 class MultiQC_clarity_metadata(BaseMultiqcModule):
     def __init__(self):
@@ -28,6 +31,7 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
             plugin fetches data from a specified
             <a href="https://www.genologics.com/clarity-lims/" target="_blank">Basespace Clarity LIMS</a> instance.</p>'''
 
+        BASEURI, USERNAME, PASSWORD, VERSION, MAIN_LOG = genologics_config.load_config(specified_config=config.kwargs.get('clarity_config'))
         self.lims = Lims(BASEURI, USERNAME, PASSWORD)
         self.metadata = {}
         self.header_metadata = {}
@@ -48,11 +52,71 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
         self.make_sections()
         report.modules_output.append(self)
 
+    def csv_file_from_samplesheet(self, sample_sheet):
+        csv_lines = []
+        with open(sample_sheet) as f:
+            found_data = False
+            for line in f:
+                if found_data:
+                    csv_lines.append(line.strip())
+                else:
+                    if line.strip().startswith('[Data]'):
+                        found_data = True
+        return csv_lines
+
+    def get_raw_sample_names(self, csv_fpath, names):
+        raw_sample_names = dict()
+        with open(csv_fpath) as f:
+            csv_reader = csv.DictReader(f)
+            name_col = csv_reader.fieldnames[0]
+            for r in csv_reader:
+                correct_name = r['description'] if 'description' in r else r[name_col]
+                if correct_name not in names:
+                    continue
+                raw_sample_names[correct_name] = r[name_col]
+        return raw_sample_names
+
+    def correct_sample_name(self, name):
+        import re
+        name = re.sub(r'_S\d+$', '', name)
+        return name.replace('-', '_').replace('.', '_')
+
+    def search_by_samplesheet(self, names):
+        sample_sheet_fpath = config.kwargs['samplesheet']
+        samples_by_container = defaultdict(dict)
+        raw_names = dict((name, name) for name in names)
+        if config.kwargs.get('bcbio_csv') and isfile(config.kwargs.get('bcbio_csv')):
+            raw_names = self.get_raw_sample_names(config.kwargs['bcbio_csv'], names)
+
+        correct_sample_names = dict((self.correct_sample_name(raw_names[name]), name) for name in names)
+        for row in csv.DictReader(self.csv_file_from_samplesheet(sample_sheet_fpath), delimiter=','):
+            sample_name = row['SampleName']
+            if sample_name not in correct_sample_names.keys():
+                continue
+            sample_id = row['SampleID'] if 'SampleID' in row else row['Sample_ID']
+            container, sample_well = row['SamplePlate'], row['SampleWell'].replace('_', ':')
+            samples_by_container[container][sample_well] = (sample_name, sample_id)
+
+        for container_name, samples in samples_by_container.items():
+            matched_containers = self.lims.get_containers(name=container_name)
+            if not matched_containers or len(matched_containers) > 1:
+                continue
+            self.log.info(str(matched_containers[0].occupied_wells))
+            placements = matched_containers[0].get_placements()
+            for well, (sample_name, sample_id) in samples.items():
+                sample_artifact = self.lims.get_artifacts(samplelimsid=sample_id)
+                if sample_artifact:
+                    sample = sample_artifact.samples[0]
+                else:
+                    sample = placements[well].samples[0]
+                sample.name = correct_sample_names[sample_name]
+                self.samples.append(sample)
 
     def get_samples(self):
         if config.kwargs.get('clarity_project_name'):
             pj = self.lims.get_projects(name=config.kwargs['clarity_project_name'])
             self.samples = pj.samples
+            self.log.info("Found {} in LIMS.".format(config.kwargs['clarity_project_name']))
         else:
             names = set()
             for x in report.general_stats_data:
@@ -66,22 +130,23 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
                 names = self.edit_names(names)
 
             self.log.debug("Looking into Clarity for samples {}".format(", ".join(names)))
-            found = 0
-            try:
-                for name in names:
-                    matching_samples = self.lims.get_samples(name=name)
-                    if not matching_samples:
-                        self.log.error("Could not find a sample matching {0}, skipping.".format(name))
-                        continue
-                    if len(matching_samples) > 1:
-                        self.log.error("Found multiple samples matching {0}, skipping".format(name))
-                        continue
-                    found += 1
-                    self.samples.append(matching_samples[0])
-            except Exception as e:
-                self.log.warn("Could not connect to Clarity LIMS: {}".format(e))
-                return None
-        self.log.info("Found {} out of {} samples in LIMS.".format(found, len(names)))
+            if config.kwargs.get('samplesheet'):
+                self.search_by_samplesheet(names)
+            if not self.samples:
+                try:
+                    for name in names:
+                        matching_samples = self.lims.get_samples(name=name)
+                        if not matching_samples:
+                            self.log.error("Could not find a sample matching {0}, skipping.".format(name))
+                            continue
+                        if len(matching_samples) > 1:
+                            self.log.error("Found multiple samples matching {0}, skipping".format(name))
+                            continue
+                        self.samples.append(matching_samples[0])
+                except Exception as e:
+                    self.log.warn("Could not connect to Clarity LIMS: {}".format(e))
+                    return None
+            self.log.info("Found {} out of {} samples in LIMS.".format(len(self.samples), len(names)))
 
 
     def edit_names(self, names):
@@ -129,7 +194,11 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
                     except:
                         sample_metadata[sample.name][udf] = set()
                         sample_metadata[sample.name][udf].add(str(sample.udf[udf]))
-
+            sample_type = sample_metadata[sample.name].pop('Sample Tissue') if \
+                'Sample Tissue' in sample_metadata[sample.name] else sample_metadata[sample.name].pop('Sample Type')
+            sample_link = join(self.lims.baseuri, 'clarity', 'search?scope=Sample&query=' + sample.id)
+            sample_metadata[sample.name]['Sample Type'] = '<a href="' + sample_link + '" target="_blank">' + sample_type.pop() + '</a>'
+            report.lims_added = True
         return self.flatten_metadata(sample_metadata)
 
 
@@ -138,7 +207,7 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
             if key == 'Project':
                 metadata = self.get_project_metadata(self.schema[part]['Project'])
             elif key == 'Sample':
-                metadata =self.get_sample_metadata(self.schema[part]['Sample'])
+                metadata = self.get_sample_metadata(self.schema[part]['Sample'])
             else:
                 metadata = self.get_artifact_metadata(self.schema[part])
 

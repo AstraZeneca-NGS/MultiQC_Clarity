@@ -6,10 +6,12 @@ clarity:
 
     general_stats:
         Sample:
-            'Customer Name':
-                scale: False
-            'Customer Conc':
-                description: 'Customer Concentration (&micro;g/&micro;l)'
+            'Sample Type':
+                title: 'Type'
+            'Sample Tissue':
+                title: 'Tissue'
+            'Sample Conc.':
+                title: 'Conc.'
 
 
     clarity_module:

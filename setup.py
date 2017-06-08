@@ -35,6 +35,9 @@ setup(
                         'disable_clarity = multiqc_clarity.cli:c_disable',
                         'clarity_skip_edit_snames = multiqc_clarity.cli:c_edit_patterns',
                         'clarity_project_name = multiqc_clarity.cli:c_pname'
+                        'clarity_config = multiqc_clarity.cli:c_config'
+                        'samplesheet = multiqc_clarity.cli:c_samplesheet'
+                        'bcbio_csv = multiqc_clarity.cli:c_csv'
                         ]
     },
     classifiers = [
