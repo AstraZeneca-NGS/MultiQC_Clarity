@@ -29,16 +29,16 @@ setup(
     ],
     entry_points = {
         'multiqc.hooks.v1': [
-                        'after_modules = multiqc_clarity.multiqc_clarity:MultiQC_clarity_metadata',
-                        ],
+            'after_modules = multiqc_clarity.multiqc_clarity:MultiQC_clarity_metadata',
+        ],
         'multiqc.cli_options.v1': [
-                        'disable_clarity = multiqc_clarity.cli:c_disable',
-                        'clarity_skip_edit_snames = multiqc_clarity.cli:c_edit_patterns',
-                        'clarity_project_name = multiqc_clarity.cli:c_pname'
-                        'clarity_config = multiqc_clarity.cli:c_config'
-                        'samplesheet = multiqc_clarity.cli:c_samplesheet'
-                        'bcbio_csv = multiqc_clarity.cli:c_csv'
-                        ]
+            'disable_clarity = multiqc_clarity.cli:c_disable',
+            'clarity_skip_edit_snames = multiqc_clarity.cli:c_edit_patterns',
+            'clarity_project_name = multiqc_clarity.cli:c_pname',
+            'clarity_config = multiqc_clarity.cli:c_config',
+            'samplesheet = multiqc_clarity.cli:c_samplesheet',
+            'bcbio_csv = multiqc_clarity.cli:c_csv',
+        ]
     },
     classifiers = [
         'Development Status :: 4 - Beta',
