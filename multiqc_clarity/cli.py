@@ -20,7 +20,7 @@ c_edit_patterns = click.option('--clarity_skip_name_editing',
 )
 c_config = click.option('--clarity_config',
     type = str,
-    help = 'Сonfiguration for Genologics API'
+    help = 'Configuration for Genologics API'
 )
 c_samplesheet = click.option('--samplesheet',
     type = str,
