@@ -1,9 +1,7 @@
 import csv
+import traceback
 from collections import OrderedDict, defaultdict
 from os.path import isfile, join
-
-from genologics.lims import Lims
-from genologics import config as genologics_config
 
 from multiqc.utils import report, config
 from multiqc.modules.base_module import BaseMultiqcModule
@@ -20,10 +18,10 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
         # Check that this plugin hasn't been disabled
         if config.kwargs.get('disable_clarity', False) is True:
             self.log.info("Skipping MultiQC_Clarity as disabled on command line")
-            return None
+            return
         if getattr(config, 'disable_clarity', False) is True:
             self.log.debug("Skipping MultiQC_Clarity as specified in config file")
-            return None
+            return
 
         super(MultiQC_clarity_metadata, self).__init__(name='Clarity LIMS', anchor='clarity')
 
@@ -31,6 +29,13 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
             plugin fetches data from a specified
             <a href="https://www.genologics.com/clarity-lims/" target="_blank">Basespace Clarity LIMS</a> instance.</p>'''
 
+        try:
+            from genologics.lims import Lims
+            from genologics import config as genologics_config
+        except:
+            self.log.warning("Importing genologics failed: " + traceback.format_exc())
+            return
+        
         BASEURI, USERNAME, PASSWORD, VERSION, MAIN_LOG = genologics_config.load_config(specified_config=config.kwargs.get('clarity_config'))
         self.lims = Lims(BASEURI, USERNAME, PASSWORD)
         self.metadata = {}
@@ -42,7 +47,7 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
         self.schema = getattr(config, 'clarity', None)
         if self.schema is None:
             self.log.debug("No config found for MultiQC_Clarity")
-            return None
+            return
 
         self.get_samples()
         self.get_metadata('report_header_info')
