@@ -56,9 +56,12 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
             return
 
         self.get_samples()
-        self.get_metadata('report_header_info')
-        self.get_metadata('general_stats')
-        self.get_metadata('clarity_module')
+        if 'report_header_info' in self.schema:
+            self.get_metadata('report_header_info')
+        if 'general_stats' in self.schema:
+            self.get_metadata('general_stats')
+        if 'clarity_module' in self.schema:
+            self.get_metadata('clarity_module')
         self.update_multiqc_report()
         self.make_sections()
         report.modules_output.append(self)
