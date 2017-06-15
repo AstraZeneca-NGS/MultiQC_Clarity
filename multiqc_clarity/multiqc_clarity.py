@@ -36,7 +36,13 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
             self.log.warning("Importing genologics failed: " + traceback.format_exc())
             return
         
-        BASEURI, USERNAME, PASSWORD, VERSION, MAIN_LOG = genologics_config.load_config(specified_config=config.kwargs.get('clarity_config'))
+        try:
+            BASEURI, USERNAME, PASSWORD, VERSION, MAIN_LOG = genologics_config.load_config(specified_config=config.kwargs.get('clarity_config'))
+        except SystemExit:
+            self.log.warning("Genologics config file is not specified as --clarity_config or in ~/.genologicsrc. "
+                             "Skip running Clarity module")
+            return
+        
         self.lims = Lims(BASEURI, USERNAME, PASSWORD)
         self.metadata = {}
         self.header_metadata = {}
