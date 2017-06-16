@@ -109,20 +109,21 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
                 continue
             sample_id = row['SampleID'] if 'SampleID' in row else row['Sample_ID']
             container, sample_well = row['SamplePlate'], row['SampleWell'].replace('_', ':')
-            samples_by_container[container][sample_well] = (sample_name, sample_id)
+            sample_artifacts = self.lims.get_artifacts(samplelimsid=sample_id)
+            if sample_artifacts:
+                sample = sample_artifacts[0].samples[0]
+                sample.name = correct_sample_names[sample_name]
+                self.samples.append(sample)
+            else:
+                samples_by_container[container][sample_well] = sample_name
 
-        for container_name, samples in samples_by_container.items():
-            matched_containers = self.lims.get_containers(name=container_name)
-            if not matched_containers or len(matched_containers) > 1:
+        for container_id, samples in samples_by_container.items():
+            artifacts = self.lims.get_artifacts(containerlimsid=container_id)
+            if not artifacts:
                 continue
-            self.log.info(str(matched_containers[0].occupied_wells))
-            placements = matched_containers[0].get_placements()
-            for well, (sample_name, sample_id) in samples.items():
-                sample_artifact = self.lims.get_artifacts(samplelimsid=sample_id)
-                if sample_artifact:
-                    sample = sample_artifact.samples[0]
-                else:
-                    sample = placements[well].samples[0]
+            placements = artifacts[0].container.get_placements()
+            for well, sample_name in samples.items():
+                sample = placements[well].samples[0]
                 sample.name = correct_sample_names[sample_name]
                 self.samples.append(sample)
 
