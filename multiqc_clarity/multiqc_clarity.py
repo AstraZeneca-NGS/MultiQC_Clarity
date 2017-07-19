@@ -54,17 +54,20 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
         if self.schema is None:
             self.log.debug("No config found for MultiQC_Clarity")
             return
-
-        self.get_samples()
-        if 'report_header_info' in self.schema:
-            self.get_metadata('report_header_info')
-        if 'general_stats' in self.schema:
-            self.get_metadata('general_stats')
-        if 'clarity_module' in self.schema:
-            self.get_metadata('clarity_module')
-        self.update_multiqc_report()
-        self.make_sections()
-        report.modules_output.append(self)
+        try:
+            self.get_samples()
+            if 'report_header_info' in self.schema:
+                self.get_metadata('report_header_info')
+            if 'general_stats' in self.schema:
+                self.get_metadata('general_stats')
+            if 'clarity_module' in self.schema:
+                self.get_metadata('clarity_module')
+            self.update_multiqc_report()
+            self.make_sections()
+            report.modules_output.append(self)
+        except:
+            self.log.error("MultiQC_Clarity failed: " + traceback.format_exc())
+            return
 
     def csv_file_from_samplesheet(self, sample_sheet):
         csv_lines = []
@@ -199,21 +202,28 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
         return self.flatten_metadata(project_metadata)
 
     def get_sample_metadata(self, udfs):
-        sample_metadata={}
+        sample_metadata = {}
+        report.lims_col = 'sample name'
         for sample in self.samples:
-            sample_metadata[sample.name]={}
+            sample_metadata[sample.name] = defaultdict(set)
             for udf in udfs:
                 if udf in sample.udf:
-                    try:
-                        sample_metadata[sample.name][udf].add(str(sample.udf[udf]))
-                    except:
-                        sample_metadata[sample.name][udf] = set()
-                        sample_metadata[sample.name][udf].add(str(sample.udf[udf]))
-            sample_type = sample_metadata[sample.name].pop('Sample Tissue') if \
-                'Sample Tissue' in sample_metadata[sample.name] else sample_metadata[sample.name].pop('Sample Type')
+                    sample_metadata[sample.name][udf].add(str(sample.udf[udf]))
+            sample_type = None
+            if 'Sample Tissue' in sample_metadata[sample.name]:
+                sample_type = sample_metadata[sample.name].pop('Sample Tissue')
+            elif 'Sample Type' in sample_metadata[sample.name]:
+                sample_type = sample_metadata[sample.name].pop('Sample Type')
             sample_link = join(self.lims.baseuri, 'clarity', 'search?scope=Sample&query=' + sample.id)
-            sample_metadata[sample.name]['Sample Type'] = '<a href="' + sample_link + '" target="_blank">' + sample_type.pop() + '</a>'
-            report.lims_added = True
+            if sample_type:
+                sample_metadata[sample.name]['Sample Type'] = '<a href="' + sample_link + '" target="_blank">' + sample_type.pop() + '</a>'
+                report.lims_added = True
+            elif 'Sample Conc.' in sample_metadata[sample.name]:
+                sample_metadata[sample.name]['Sample Conc.'] = '<a href="' + sample_link + '" target="_blank">' + \
+                                                               sample_metadata[sample.name]['Sample Conc.'].pop() + '</a>'
+                report.lims_added = True
+        if not any(['Sample Tissue' in sample_metadata[sample.name] for sample in self.samples]):
+            report.lims_col = 'sample conc'
         return self.flatten_metadata(sample_metadata)
 
 
