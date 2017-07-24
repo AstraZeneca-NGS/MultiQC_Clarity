@@ -144,8 +144,8 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
                     self.names.update(d.keys())
                 except AttributeError:
                     pass
-            if not config.kwargs.get('clarity_skip_edit_names'):
-                names = self.edit_names(names)
+            # if not config.kwargs.get('clarity_skip_edit_names'):
+            #    names = self.edit_names(names)
 
             self.log.debug("Looking into Clarity for samples {}".format(", ".join(names)))
             if config.kwargs.get('samplesheet'):
@@ -205,10 +205,14 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
         sample_metadata = {}
         report.lims_col = 'sample name'
         for sample in self.samples:
-            sample_metadata[sample.name] = defaultdict(set)
+            sample_metadata[sample.name] = dict()
             for udf in udfs:
                 if udf in sample.udf:
-                    sample_metadata[sample.name][udf].add(str(sample.udf[udf]))
+                    try:
+                        sample_metadata[sample.name][udf].add(str(sample.udf[udf]))
+                    except:
+                        sample_metadata[sample.name][udf] = set()
+                        sample_metadata[sample.name][udf].add(str(sample.udf[udf]))
             sample_type = None
             if 'Sample Tissue' in sample_metadata[sample.name]:
                 sample_type = sample_metadata[sample.name].pop('Sample Tissue')
@@ -222,8 +226,10 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
                 sample_metadata[sample.name]['Sample Conc.'] = '<a href="' + sample_link + '" target="_blank">' + \
                                                                sample_metadata[sample.name]['Sample Conc.'].pop() + '</a>'
                 report.lims_added = True
-        if not any(['Sample Tissue' in sample_metadata[sample.name] for sample in self.samples]):
+        if not any(['Sample Type' in sample_metadata[sample.name] for sample in self.samples]):
             report.lims_col = 'sample conc'
+        elif not all(['Sample Type' in sample_metadata[sample.name] for sample in self.samples]):
+            report.lims_col = 'sample type or sample conc'
         return self.flatten_metadata(sample_metadata)
 
 
