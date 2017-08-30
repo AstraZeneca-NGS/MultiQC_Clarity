@@ -203,7 +203,7 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
 
     def get_sample_metadata(self, udfs):
         sample_metadata = {}
-        report.lims_col = 'sample name'
+        report.lims_col = 'sample type'
         for sample in self.samples:
             sample_metadata[sample.name] = dict()
             for udf in udfs:
