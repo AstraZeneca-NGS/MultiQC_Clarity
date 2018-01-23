@@ -96,7 +96,7 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
     def correct_sample_name(self, name):
         import re
         name = re.sub(r'_S\d+$', '', name)
-        return name.replace('-', '_').replace('.', '_')
+        return name.replace('.', '_')
 
     def search_by_samplesheet(self, names):
         sample_sheet_fpath = config.kwargs['samplesheet']
@@ -107,18 +107,19 @@ class MultiQC_clarity_metadata(BaseMultiqcModule):
 
         correct_sample_names = dict((self.correct_sample_name(raw_names[name]), name) for name in names)
         for row in csv.DictReader(self.csv_file_from_samplesheet(sample_sheet_fpath), delimiter=','):
-            sample_name = row['SampleName']
-            if sample_name not in correct_sample_names.keys():
-                continue
+            sample_name = row['SampleName'] if 'SampleName' in row else (row['Sample_Name'] if 'Sample_Name' in row else row['SampleRef'])
             sample_id = row['SampleID'] if 'SampleID' in row else row['Sample_ID']
-            container, sample_well = row['SamplePlate'], row['SampleWell'].replace('_', ':')
             sample_artifacts = self.lims.get_artifacts(samplelimsid=sample_id)
             if sample_artifacts:
                 sample = sample_artifacts[0].samples[0]
                 sample.name = correct_sample_names[sample_name]
                 self.samples.append(sample)
-            else:
-                samples_by_container[container][sample_well] = sample_name
+            elif sample_name and sample_name in correct_sample_names.keys():
+                try:
+                    container, sample_well = row['SamplePlate'], row['SampleWell'].replace('_', ':')
+                    samples_by_container[container][sample_well] = sample_name
+                except:
+                    pass
 
         for container_id, samples in samples_by_container.items():
             artifacts = self.lims.get_artifacts(containerlimsid=container_id)
